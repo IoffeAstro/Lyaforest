@@ -54,6 +54,29 @@ class Voigt():
 # 
 #==============================================================================
 
+
+def voigt(a, x, calc='spec'):
+    """
+    Returns voigt function
+
+    parameters:
+        - a       : a parameter
+        - x       : x parameter
+        - calc    : type of calculation
+
+    return:
+        voigt     : voigt function at x positions
+    """
+    if calc == 'spec':
+        v = Voigt(0)
+        v.set(a, x, 0)
+        return v.H
+
+
+# ==============================================================================
+#
+# ==============================================================================
+
 class line:
     def __init__(self, name, l, f, g):
         line.name = name
@@ -61,22 +84,20 @@ class line:
         line.l = l
         line.g = g
 
-
 def funct(x, a, tau_0):
     return (wofz(x + 1j*a).real*tau_0-0.001)**2
+
 
 def FisherbN(b, N, lines, ston=1, cgs=0, convolve=1, res=50000, z=2.67, verbose=1, plots=1):
     """
     calculate the Fisher matrix for a given b and logN, the parameters of line profile
     
-    input:
+    parameters:
         - b         :  b parameter in km/s
         - N         :  column density in log10[, cm^-2] units
         - lines     :  list of lines
         - ston      :  Signal to Noise ratio, inverse of dispersion
-    
-    options:
-        - cgs       :  if 0 then derivative for N in cm^-2 and b in cm/s 
+        - cgs       :  if 0 then derivative for N in cm^-2 and b in cm/s
         - convolve  :  if 1 convolve data else not convolve
         - res       :  resolution of the spectrograph (assuming 3 pixels in FWHM)
         - z         :  redshift of line   
@@ -100,25 +121,25 @@ def FisherbN(b, N, lines, ston=1, cgs=0, convolve=1, res=50000, z=2.67, verbose=
         fig, ax = plt.subplots(6, 1, figsize=(8,20))
         
     for line in lines:
-        bin_width = line.l*(1+z)/res/2.5
+        bin_width = line.l * (1+z) / res / 2.5
         #print(bin_width)
         if verbose:
             print('bin width=', bin_width)
             
-        dl = line.l*b/const.c.to('km/s').value
+        dl = line.l * b / const.c.to('km/s').value
         if verbose:
             print(r'dl =', dl)        
         
-        a = line.g*line.l/1e8/4/np.pi/b/1e5
+        a = line.g * line.l / 1e8 / 4 / np.pi / b / 1e5
         if verbose:
             print('a=', a)        
 
-        tau_0 = 0.014983*line.l*line.f/1e8*np.power(10.0,N)/b/1e5
+        tau_0 = 0.014983 * line.l * line.f / 1e8 * np.power(10.0,N) / b / 1e5
         
         x_lim = optimize.fmin(funct, 2, args=(a, tau_0), disp=0)
         
-        l = np.linspace(line.l-dl*x_lim*3,line.l+dl*x_lim*3, n)
-        x = (l-line.l)/dl
+        l = np.linspace(line.l - dl * x_lim * 3, line.l + dl * x_lim * 3, n)
+        x = (l - line.l) / dl
        
         if verbose:
             print('tau_0=', tau_0)
@@ -126,20 +147,20 @@ def FisherbN(b, N, lines, ston=1, cgs=0, convolve=1, res=50000, z=2.67, verbose=
         
         for i, xi in enumerate(x):
             V.set(a, xi, 3)
-            tau = tau_0*V.H
+            tau = tau_0 * V.H
             F_unc[0, i] = 1
             if not cgs:
-                F_unc[1, i] = (tau**2-tau)*np.log(10)**2
-                F_unc[2, i] = tau_0*V.H2x/2/b*(tau-1)*np.log(10)
-                F_unc[3, i] = tau_0/2/b/b*(tau_0/2*V.H2x**2 - a*V.H3a - xi*V.H3x + 2*V.H2x)
+                F_unc[1, i] = (tau**2-tau) * np.log(10)**2
+                F_unc[2, i] = tau_0 * V.H2x / 2 / b * (tau-1) * np.log(10)
+                F_unc[3, i] = tau_0 / 2 / b / b * (tau_0/2*V.H2x**2 - a*V.H3a - xi*V.H3x + 2*V.H2x)
                 F_unc[4, i] = tau*np.log(10)
-                F_unc[5, i] = tau_0/2/b*V.H2x
+                F_unc[5, i] = tau_0 / 2 / b * V.H2x
             else:
-                F_unc[1, i] = (tau/np.power(10.0,N))**2
-                F_unc[2, i] = tau_0*V.H2x/2/np.power(10.0,N)/b/1e5*(tau-1)
-                F_unc[3, i] = tau_0/2/b/b/1e10*(tau_0/2*V.H2x**2 - a*V.H3a - xi*V.H3x + 2*V.H2x)
-                F_unc[4, i] = tau/10**N
-                F_unc[5, i] = tau_0/2/b/1e5*V.H2x
+                F_unc[1, i] = (tau / np.power(10.0,N))**2
+                F_unc[2, i] = tau_0 * V.H2x / 2 / np.power(10.0,N) / b / 1e5 * (tau-1)
+                F_unc[3, i] = tau_0 / 2 / b / b / 1e10 * (tau_0/2*V.H2x**2 - a*V.H3a - xi*V.H3x + 2*V.H2x)
+                F_unc[4, i] = tau / 10**N
+                F_unc[5, i] = tau_0 / 2 / b / 1e5 * V.H2x
 
             F_unc[:,i] *= np.exp(-tau)
         

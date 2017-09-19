@@ -5,20 +5,22 @@ Created on Fri Apr 28 23:37:24 2017
 @author: User
 """
 
+from chainconsumer import ChainConsumer
 import corner
-import pickle
 import emcee
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+from matplotlib.ticker import AutoMinorLocator, MultipleLocator
 import numpy as np
+import pickle
 import scipy.stats as stats
-from chainconsumer import ChainConsumer
 from scipy.integrate import dblquad
 from scipy.integrate import quad
 from scipy.ndimage import filters
 from scipy import stats
-from Fisher import FisherbN, line
-import matplotlib.patches as patches
 import time
+
+from Fisher import FisherbN, line
 
 
 class timer:
@@ -123,7 +125,7 @@ class model():
         self.set_range()
         self.N0 = 12
 
-    def set_pars (self, alpha=0.17, b0=0.9, power = 2., beta=-1.2): #(self, alpha=0.17, b0=0.9, power = 2.): #(self, alpha=0.17, b0=0.9, power = 2., beta=-1.2): #(self, alpha=0.15, b0=1.07, power=1.3, beta=-1.2):  # #(self, alpha=0.15, b0=1.07, turb=12, beta=-1.2):    #(self, alpha=0.15, b0=1.07, turb=20, beta=-1.2):
+    def set_pars (self, alpha=0.193, b0=0.882, power=1.8, beta=-1.924): #(self, alpha=0.17, b0=0.9, power = 2.): #(self, alpha=0.17, b0=0.9, power = 2., beta=-1.2): #(self, alpha=0.15, b0=1.07, power=1.3, beta=-1.2):  # #(self, alpha=0.15, b0=1.07, turb=12, beta=-1.2):    #(self, alpha=0.15, b0=1.07, turb=20, beta=-1.2):
         #p = ['alpha', 'b0', 'turb', 'beta']
         #p = ['alpha', 'b0', 'turb_m', 'turb_s', 'beta']
         p = ['alpha', 'b0', 'power', 'beta']
@@ -181,21 +183,21 @@ class model():
         else:
             self.xerr, self.yerr =  0.05*np.ones_like(self.x), 2*np.ones_like(self.x)
 
-    def save_data(self):
+    def save_data(self, fname='model.dat'):
         """
         save the data of the model
         """
         print(np.array([self.x, self.xerr, self.y, self.yerr]).transpose())
-        np.savetxt('model_data.dat', np.array([self.x, self.xerr, self.y, self.yerr]).transpose(), fmt='%.2f')
+        np.savetxt(fname, np.array([self.x, self.xerr, self.y, self.yerr]).transpose(), fmt='%.2f')
 
-    def load_data(self, fname=None):
+    def load_data(self, fname='data.dat'):
         """
         load the data of the model:
         parameters:
             - fname     : filename to load from the data, if None load from 'model_data.dat'
         """
 #        data = np.genfromtxt('model_data.dat', unpack=True)
-        data = np.genfromtxt('qso.dat', unpack=True)
+        data = np.genfromtxt(fname, unpack=True)
    
 #        data = np.transpose(np.genfromtxt('qsos_sum.csv', delimiter=','))
 #        data = pickle.load(open( "cut_qso.pkl", "rb" ))
@@ -212,6 +214,17 @@ class model():
             #print('er x, y')
             #print(min(data[1]), max(data[1]), min(data[3]), max(data[3]) )
         #self.x, self.xerr, self.y, self.yerr = [13.1], [0.2], [18], [2]
+
+    def clean_data(self):
+        for i in range(len(self.x)):
+            for j in range(len(self.y)):
+                if i != j:
+                    if self.x[i] == self.x[j] and self.y[i] == self.y[j]:
+                        self.xerr[i] = max(self.xerr[i], self.xerr[j])
+                        self.xerr[j] = self.xerr[i]
+                        self.yerr[i] = max(self.yerr[i], self.yerr[j])
+                        self.yerr[j] = self.yerr[i]
+
     def gauss(self, Ni, bi):
         x, y, xerr, yerr = self.tr_data[:, 0, :][self.ind[:,0] ==1], self.tr_data[:, 1, :][self.ind[:,0] ==1], self.tr_data[:, 2, :][self.ind[:,0] ==1], self.tr_data[:, 3, :][self.ind[:,0] ==1]
 
@@ -237,22 +250,18 @@ class model():
                 #self.make_and_calc_grid_gauss(num)
                     
                 #self.arr_grid=self.arr_grid[:i]    
-#                a = self.probab_for_array(self.arr_grid[:, 0, :], self.arr_grid[:, 1, :])
-#                a_norm = self.probab_for_array(self.arr_grid[:, 2, :], self.arr_grid[:, 3, :])
-#                           
-                                         
+                #a = self.probab_for_array(self.arr_grid[:, 0, :], self.arr_grid[:, 1, :])
+                #a_norm = self.probab_for_array(self.arr_grid[:, 2, :], self.arr_grid[:, 3, :])
+
                 self.ind = np.zeros((len(self.tr_data), self.num))
-                e=[]
                 e = np.arange(len(self.tr_data[:, 1, 0]))[self.tr_data[:, 1, 0] <= 10**(self.pars.alpha*(self.tr_data[:, 0, 0]-self.N0) + self.pars.b0)]
-                
-                
+
                 for i in (e):
                     self.ind[i,:]=1
-                    
-               
-#                for i in range(len(self.tr_data)):
-#                    if self.tr_data[i, 1] <= 10**(self.pars.alpha*(self.tr_data[i, 0]-self.N0) + self.pars.b0):
-#                        ind[i,:]=1
+
+                #for i in range(len(self.tr_data)):
+                #    if self.tr_data[i, 1] <= 10**(self.pars.alpha*(self.tr_data[i, 0]-self.N0) + self.pars.b0):
+                #        ind[i,:]=1
                  
                 a_up = self.probab_for_array(self.arr_grid[:, 0, :][self.ind[:,0] !=1], self.arr_grid[:, 1, :][self.ind[:,0] !=1])
                 a_down = self.probab_for_array(self.u_xy[:, 0, :][self.ind[:,0] ==1], self.u_xy[:, 1, :][self.ind[:,0] ==1]) * self.gauss(self.u_xy[:, 0, :][self.ind[:,0] ==1], self.u_xy[:, 1, :][self.ind[:,0] ==1])
@@ -265,30 +274,27 @@ class model():
                 else:
                     a = self.probab_for_array(self.arr_grid[:, 0, :], self.arr_grid[:, 1, :])
                     a_norm = self.probab_for_array(self.arr_grid[:, 2, :], self.arr_grid[:, 3, :])
-                
+
                 #print(np.shape(a_down))
 
-#                a = self.probab_for_array(self.arr_grid[:, 0, :], self.arr_grid[:, 1, :]) * (1-self.ind[:,:]) + self.probab_for_array(self.u_xy[:, 0, :], self.u_xy[:, 1, :]) * self.gauss(self.u_xy[:, 0, :], self.u_xy[:, 1, :]) * self.ind[:,:]      
-#                a_norm = self.probab_for_array(self.arr_grid[:, 2, :], self.arr_grid[:, 3, :])
+                #a = self.probab_for_array(self.arr_grid[:, 0, :], self.arr_grid[:, 1, :]) * (1-self.ind[:,:]) + self.probab_for_array(self.u_xy[:, 0, :], self.u_xy[:, 1, :]) * self.gauss(self.u_xy[:, 0, :], self.u_xy[:, 1, :]) * self.ind[:,:]
+                #a_norm = self.probab_for_array(self.arr_grid[:, 2, :], self.arr_grid[:, 3, :])
         
-                
- #               self.arr_prob = np.sum(a, axis=1)
- #               self.arr_prob_norm = np.sum(a_norm, axis=1)
+                #self.arr_prob = np.sum(a, axis=1)
+                #self.arr_prob_norm = np.sum(a_norm, axis=1)
 
                 prob = np.sum(a, axis=1)/(np.sum(a_norm, axis=1))
-               
-              
-#                print(np.sum(a, axis=1))
-#                print(np.sum(a_norm, axis=1))
-#                print(np.prod(prob))
+
+                #print(np.sum(a, axis=1))
+                #print(np.sum(a_norm, axis=1))
+                #print(np.prod(prob))
                 
- #               s = np.sum(np.log(prob+1.e-100))
-#                s = np.sum(np.log(prob))
+                #s = np.sum(np.log(prob+1.e-100))
+                #s = np.sum(np.log(prob))
                 s = np.sum(np.log((prob+1.e-30)))
                 
-#                print(s)
-                
-            
+                #print(s)
+
         if kind == 'integ':
             t = timer()
             self.make_grid(n=num)
@@ -333,8 +339,6 @@ class model():
         else:
          return -np.inf
 
-        
-        
     def probab(self, Ni, bi):
         """
         return pdf of the model
@@ -367,45 +371,34 @@ class model():
 
         #print(Ni)
         
-        N, b = np.meshgrid(Ni, bi)
+        #N, b = np.meshgrid(Ni, bi)
         
-        bth = 10**(self.pars.alpha*(N-self.N0) + self.pars.b0)
+        bth = 10**(self.pars.alpha * (N-self.N0) + self.pars.b0)
         scale = self.pars.turb**2
-        x = (b**2 - bth**2)/(2*scale)
+        x = (b**2 - bth**2) / (2 * scale)
         
         z = np.zeros_like(N)
         m = x > 0
 
-        z[m] =   c2 * np.sqrt(x[m]) * np.exp(-x[m]) * (b[m]/self.pars.turb**2) * np.power(10, N[m]*(self.pars.beta+1))
+        z[m] =  c2 * np.sqrt(x[m]) * np.exp(-x[m]) * (b[m]/self.pars.turb**2) * np.power(10, N[m]*(self.pars.beta+1))
         return z
         
-    def probab_for_array(self, Ni, bi):
+    def probab_for_array(self, N, b):
         """
         return pdf of the model
         parameters:
             - bi      : doppler parameter
             - Ni      : column density
         """        
-#        for i in range(len(Ni)):
-#            N1, b1 = np.meshgrid(Ni[i, :], bi[i, :])
-#            if i==0:
-#                N = N1
-#                b = b1
-#            else:    
-#                N = np.append(N, N1, axis=0)
-#                b = np.append(b, b1, axis=0)
 
-        N=Ni
-        b=bi
-        
         bth = 10**(self.pars.alpha*(N-self.N0) + self.pars.b0)
         #scale = 0.5*self.pars.turb**(-2)
         scale = 1
         x = (b**2 - bth**2)*scale
-        
-        
+
         z = np.zeros_like(N)
         m = x > 0
+        print(b, x, m)
 
         if 1:
             #z[m] =  np.sqrt(x[m]) * np.exp(-x[m]) * (b[m]*scale) * np.power(10, N[m]*(self.pars.beta+1))
@@ -565,7 +558,7 @@ class model():
         ax.set_ylim(self.ymin, self.ymax)
         ax.set_xlim(self.xmin, self.xmax)
 
-    def plot_data(self, ax=None):
+    def plot_data(self, ax=None, save=False, plot_box=False):
         """
         plot the data of the model
         parameters:
@@ -573,19 +566,44 @@ class model():
         """
         if ax is None:
             fig, ax = plt.subplots()
+            save = True
         ax.errorbar(self.x, self.y, xerr=[self.xerr, self.xerr], yerr=[self.yerr, self.yerr],
                     fmt='o', marker='o', color='b', markersize=2)
-        x=np.arange(self.xmin, self.xmax, 0.01)            
-        ax.plot(x, 10**((0.209*(x-self.N0) +0.847)), color='g',  lw='2') 
-        #ax.plot(x, 10**((0.233*(x-self.N0) + 0.81)), color='m', lw='1')  
-        #ax.plot(x, 10**((0*(x-self.N0) + self.pars.b0)), color='c',  lw='1')          
-        #ax.scatter(self.x, 10**((self.pars.alpha*(self.x-self.N0) + self.pars.b0)), marker='.', color='g')
-        #ax.scatter(self.x, 10**((self.pars.alpha*(self.x-self.N0) + 1.08)), marker='.', color='r')
-        ax.add_patch(patches.Rectangle((self.xmin, self.ymin), self.xmax - self.xmin, self.ymax - self.ymin, 
-                                       fill = False, edgecolor = 'red'))            
-        plt.xlabel('$\log N$')
-        plt.ylabel('$b$')
-        fig.savefig("qso_data.png")
+        if plot_box:
+            x=np.arange(self.xmin, self.xmax, 0.01)
+            ax.plot(x, 10**((0.209*(x-self.N0) +0.847)), color='g',  lw='2')
+            #ax.plot(x, 10**((0.233*(x-self.N0) + 0.81)), color='m', lw='1')
+            #ax.plot(x, 10**((0*(x-self.N0) + self.pars.b0)), color='c',  lw='1')
+            #ax.scatter(self.x, 10**((self.pars.alpha*(self.x-self.N0) + self.pars.b0)), marker='.', color='g')
+            #ax.scatter(self.x, 10**((self.pars.alpha*(self.x-self.N0) + 1.08)), marker='.', color='r')
+            ax.add_patch(patches.Rectangle((self.xmin, self.ymin), self.xmax - self.xmin, self.ymax - self.ymin,
+                                           fill = False, edgecolor = 'red'))
+        ax.set_xlabel('$\log N$[cm$^{-2}$]')
+        ax.set_ylabel('$b$, km/s')
+        if save:
+            fig.savefig("qso_data.png")
+
+    def plot_pdf(self, ax=None, save=False, N_range=[13, 15], b_range=[8, 35]):
+        if ax is None:
+            fig, ax = plt.subplots()
+            save = True
+        else:
+            N_range = ax.get_xlim()
+            b_range = ax.get_ylim()
+            print(N_range, b_range)
+
+        num = 100
+        N, b = np.meshgrid(np.linspace(N_range[0], N_range[1], num), np.linspace(b_range[0], b_range[1], num))
+
+        z = self.probab_for_array(N, b)
+
+        print(z)
+
+        ax.contourf(N, b, z, levels=np.linspace(0, np.max(z.flatten()), 100), cmap=plt.cm.bone_r)
+        ax.set_xlabel('$\log N$[cm$^{-2}$]')
+        ax.set_ylabel('$b$, km/s')
+        if save:
+            fig.savefig("qso_data.png")
 
     def mcmc(self, ax=None, nwalkers=10, nsteps=20000):
         """
@@ -632,28 +650,23 @@ class model():
             
 
             for i, result in enumerate(sampler.sample(pos0, iterations=nsteps, storechain=False)):
-                    if (i+1) % 10 == 0:
-                        print("{0:5.1%}".format(float(i) / nsteps))
-                    
-#                    print(result[0])
-#                    print(np.shape(result))
-                    data2[i] = result[1]
-                    data[i] = result[0]                    
-                    
-                
-#                    print(np.shape(data))
-#                    print(np.array(data)[:,9, :])
-                
-#                    input()
+                if (i+1) % 10 == 0:
+                    print("{0:5.1%}".format(float(i) / nsteps))
+                    #print(result[0])
+                    #print(np.shape(result))
+
+                data2[i] = result[1]
+                data[i] = result[0]
+
             dat[:, :, 0] = data2
             dat[:, :, 1:] = data
             print((np.array(dat)[:, :, :]))
-            if save == 1:
-                
 
+            if save == 1:
                 pickle.dump(data, open("chain02b3.pkl", "wb"))
                 pickle.dump(data2, open("chain_lik02b3.pkl", "wb"))
                 pickle.dump(dat, open("all3b3.pkl", "wb"))
+
             print("Mean acceptance fraction: {0:.3f}".format(np.mean(sampler.acceptance_fraction)))
             #print("autocorrelation time")
             #print(sampler.get_autocorr_time())
@@ -782,16 +795,28 @@ if __name__ == '__main__':
         lyman.generate_data(300)
         lyman.save_data()
     else:
-        lyman.load_data()
+        lyman.load_data(fname='qso.dat')
+        lyman.clean_data()
+
     lyman.make_and_calc_grid_gauss(500)    
     if 1:
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(figsize=(20, 8))
         #lyman.make_grid(n=200)
         #lyman.calc_grid()
         #lyman.plot_prob(ax=ax)
         lyman.plot_data(ax=ax)
+        ax.set_xlim([min(lyman.x) - 0.02, max(lyman.x) + 0.02])
+        ax.set_ylim([9, max(lyman.y) + 0.5])
+
+        lyman.plot_pdf(ax=ax)
         #lyman.plot_const(ax=None)
-        
+
+        ax.xaxis.set_minor_locator(AutoMinorLocator(5))
+        ax.xaxis.set_major_locator(MultipleLocator(0.5))
+        ax.yaxis.set_minor_locator(AutoMinorLocator(5))
+        ax.yaxis.set_major_locator(MultipleLocator(5))
+
+        plt.savefig("qso_data2.png", dpi=300)
 
     if 1:
         pass
